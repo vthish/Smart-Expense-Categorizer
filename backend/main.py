@@ -1,46 +1,54 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 import joblib
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import SGDClassifier
 import re
 import os
 
 app = FastAPI()
 
-# Global variables for model and vectorizer
-model = None
-vectorizer = None
+MODEL_DIR = "models"
+MODEL_PATH = f"{MODEL_DIR}/smart_model.pkl"
+VEC_PATH = f"{MODEL_DIR}/vectorizer.pkl"
+DATA_PATH = "../assets/data.csv"
 
-# Load models on startup
-@app.on_event("startup")
-def load_models():
-    global model, vectorizer
-    try:
-        model = joblib.load('models/smart_model.pkl')
-        vectorizer = joblib.load('models/vectorizer.pkl')
-        print("AI Models loaded successfully.")
-    except Exception as e:
-        print(f"Error loading models: {e}")
+if not os.path.exists(MODEL_DIR):
+    os.makedirs(MODEL_DIR)
 
-class PredictionRequest(BaseModel):
+def train_model():
+    if not os.path.exists(DATA_PATH): return
+    df = pd.read_csv(DATA_PATH)
+    vec = TfidfVectorizer(ngram_range=(1, 2))
+    X = vec.fit_transform(df['sentence'].values.astype('U'))
+    y = df['category']
+    model = SGDClassifier(loss='modified_huber')
+    model.fit(X, y)
+    joblib.dump(model, MODEL_PATH)
+    joblib.dump(vec, VEC_PATH)
+    print("AI Model retrained successfully.")
+
+class InputData(BaseModel):
     text: str
 
 @app.post("/predict")
-async def predict(request: PredictionRequest):
-    if model is None or vectorizer is None:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+async def predict(data: InputData):
+    try:
+        model = joblib.load(MODEL_PATH)
+        vec = joblib.load(VEC_PATH)
+        v = vec.transform([data.text.lower()])
+        category = model.predict(v)[0]
+        nums = re.findall(r'\d+', data.text)
+        amount = float(nums[0]) if nums else 0.0
+        return {"category": category, "amount": amount}
+    except:
+        return {"category": "Other", "amount": 0.0}
 
-    # 1. NLP Prediction for Category
-    input_vector = vectorizer.transform([request.text.lower()])
-    category = model.predict(input_vector)[0]
-
-    # 2. Regex for Amount Extraction
-    amount_match = re.search(r'\d+', request.text)
-    amount = float(amount_match.group(0)) if amount_match else 0.0
-
-    return {
-        "category": category,
-        "amount": amount
-    }
+@app.post("/retrain")
+async def retrain(background_tasks: BackgroundTasks):
+    background_tasks.add_task(train_model)
+    return {"message": "Retraining started"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,33 +2,26 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AIService {
-  static const String _apiEndpoint = "http://192.168.8.177:8000/predict";
+  static const String _baseUrl = "http://192.168.8.177:8000";
 
-  static Future<Map<String, dynamic>> predictExpense(String text) async {
+  static Future<Map<String, dynamic>> predict(String text) async {
     try {
-      final response = await http.post(
-        Uri.parse(_apiEndpoint),
-        body: jsonEncode({"text": text}),
+      final res = await http.post(
+        Uri.parse("$_baseUrl/predict"),
         headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"text": text}),
       );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      }
+      return jsonDecode(res.body);
     } catch (e) {
-      return _localFallback(text);
+      return {"category": "Other", "amount": 0.0};
     }
-    return _localFallback(text);
   }
 
-  static Map<String, dynamic> _localFallback(String text) {
-    double amount = 0;
-    RegExp(r'\d+').allMatches(text).forEach((m) => amount = double.parse(m.group(0)!));
-    
-    String category = "Other";
-    if (text.contains("bus") || text.contains("බස්")) category = "Transport";
-    if (text.contains("food") || text.contains("කෑම")) category = "Food";
-    
-    return {"amount": amount, "category": category};
+  static Future<void> triggerLearning() async {
+    try {
+      await http.post(Uri.parse("$_baseUrl/retrain"));
+    } catch (e) {
+      print("Retrain trigger failed");
+    }
   }
 }

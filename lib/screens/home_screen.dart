@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/expense_model.dart';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
-import '../models/expense_model.dart';
 import '../widgets/glass_container.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,130 +14,95 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   final FirebaseService _db = FirebaseService();
-  String _category = "Detecting...";
+  
+  String _category = "Other";
   double _amount = 0.0;
   bool _isAnalyzing = false;
+  
+  final List<String> _allCategories = [
+    "Food", "Transport", "Utilities", "Entertainment", "Health", "Shopping", "Education", "Personal Care", "Other"
+  ];
 
-  void _analyze(String val) async {
-    if (val.isEmpty) {
-      setState(() {
-        _amount = 0.0;
-        _category = "Detecting...";
-      });
-      return;
-    }
-
+  void _handleInput(String val) async {
+    if (val.isEmpty) return;
     setState(() => _isAnalyzing = true);
-
-    // AI Prediction call
-    final res = await AIService.predictExpense(val);
-
+    final res = await AIService.predict(val);
     setState(() {
       _amount = res['amount'];
       _category = res['category'];
-      _isAnalyzing = false; // Loading finished
+      _isAnalyzing = false;
     });
+  }
+
+  void _saveAndLearn() async {
+    if (_controller.text.isEmpty) return;
+    
+    final expense = ExpenseModel(
+      sentence: _controller.text,
+      amount: _amount,
+      category: _category,
+      date: DateTime.now(),
+    );
+
+    await _db.saveExpense(expense); // Save to Firestore
+    await AIService.triggerLearning(); // Tell Backend to retrain
+
+    _controller.clear();
+    setState(() { _category = "Other"; _amount = 0.0; });
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Saved! AI learning in progress...")),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text("Smart Expense", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text("Smart Expense"), backgroundColor: Colors.transparent, elevation: 0),
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)], begin: Alignment.topLeft)
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Input Section
             GlassContainer(
               child: TextField(
                 controller: _controller,
-                onChanged: _analyze,
+                onChanged: _handleInput,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: "What did you spend today?",
-                  hintStyle: TextStyle(color: Colors.white54),
-                  border: InputBorder.none,
-                  icon: Icon(Icons.search, color: Colors.white54),
-                ),
+                decoration: const InputDecoration(hintText: "What's the expense?", hintStyle: TextStyle(color: Colors.white54), border: InputBorder.none),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Results Section with Loading Indicator
             GlassContainer(
-              child: _isAnalyzing
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.white70),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _stat("Amount", "Rs. ${_amount.toStringAsFixed(0)}"),
-                        _stat("Category", _category),
-                      ],
-                    ),
+              child: _isAnalyzing 
+                ? const CircularProgressIndicator(color: Colors.white)
+                : Column(
+                    children: [
+                      Text("Amount: Rs. $_amount", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      DropdownButton<String>(
+                        value: _category,
+                        dropdownColor: const Color(0xFF1E293B),
+                        items: _allCategories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: Colors.white)))).toList(),
+                        onChanged: (v) => setState(() => _category = v!),
+                      )
+                    ],
+                  ),
             ),
             const SizedBox(height: 30),
-
-            // Confirm Button
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.1),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  side: const BorderSide(color: Colors.white24),
-                ),
-                onPressed: () async {
-                  if (_controller.text.isNotEmpty) {
-                    await _db.saveExpense(ExpenseModel(
-                      sentence: _controller.text,
-                      amount: _amount,
-                      category: _category,
-                      date: DateTime.now(),
-                    ));
-                    _controller.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Saved & Learning Process Started!")),
-                    );
-                  }
-                },
-                child: const Text("Confirm & Learn", style: TextStyle(fontSize: 16)),
-              ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              onPressed: _saveAndLearn,
+              child: const Text("Confirm & Learn"),
             )
           ],
         ),
       ),
     );
   }
-
-  Widget _stat(String title, String value) => Column(
-        children: [
-          Text(title, style: const TextStyle(color: Colors.white60, fontSize: 14)),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          )
-        ],
-      );
 }
