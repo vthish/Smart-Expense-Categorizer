@@ -1,0 +1,10 @@
+services:
+  api:
+    build: ./backend
+    container_name: expense_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./assets:/app/../assets
+      - ./backend/models:/app/models
+    restart: always

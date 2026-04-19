@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298155782535",
+    "project_id": "smart-expense-app-17",
+    "storage_bucket": "smart-expense-app-17.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298155782535:android:4f18eca1a4c3513723a322",
+        "android_client_info": {
+          "package_name": "com.example.smart_expense_categorizer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_ex6LJUwb5i1SK7nVxVpoxHwDS5wH89Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
