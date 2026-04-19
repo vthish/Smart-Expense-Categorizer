@@ -2,37 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/expense_model.dart';
 
 class FirebaseService {
-  final CollectionReference _expensesCollection = 
-      FirebaseFirestore.instance.collection('expenses');
-  
-  final CollectionReference _learningCollection = 
-      FirebaseFirestore.instance.collection('learning_data');
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> addExpense(ExpenseModel expense) async {
-    try {
-      // Saving the actual expense
-      await _expensesCollection.add(expense.toMap());
-      
-      // Auto-learning: Store the sentence and its category for future training
-      await _learningCollection.add({
-        'sentence': expense.sentence,
-        'category': expense.category,
-        'verified': true,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print("Error saving to Firebase: $e");
-    }
+  Future<void> saveExpense(ExpenseModel expense) async {
+    await _db.collection('expenses').add(expense.toMap());
+    
+    await _db.collection('learning_data').add({
+      'sentence': expense.sentence,
+      'category': expense.category,
+      'timestamp': FieldValue.serverTimestamp(),
+      'is_verified': true,
+    });
   }
 
-  Stream<List<ExpenseModel>> getExpenses() {
-    return _expensesCollection
-        .orderBy('date', descending: true)
+  Stream<List<ExpenseModel>> getExpensesByRange(DateTime start, DateTime end) {
+    return _db.collection('expenses')
+        .where('date', isGreaterThanOrEqualTo: start)
+        .where('date', isLessThanOrEqualTo: end)
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return ExpenseModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
-    });
+        .map((snap) => snap.docs
+            .map((doc) => ExpenseModel.fromMap(doc.data(), doc.id))
+            .toList());
   }
 }
