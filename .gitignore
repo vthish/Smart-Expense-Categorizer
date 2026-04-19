@@ -54,3 +54,10 @@ app.*.map.json
 *.iml
 *.ipr
 *.iws
+
+#backend
+venv/
+__pycache__/
+*.pyc
+backend/models/*.pkl
+backend/venv/

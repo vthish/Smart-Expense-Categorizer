@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AIService {
-  static const String _apiEndpoint = "YOUR_BACKEND_URL/predict";
+  static const String _apiEndpoint = "http://192.168.8.177:8000/predict";
 
   static Future<Map<String, dynamic>> predictExpense(String text) async {
     try {
