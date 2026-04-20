@@ -23,6 +23,16 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
+  List<String> _categories = [
+    "Food", 
+    "Transport", 
+    "Health", 
+    "Shopping", 
+    "Utilities", 
+    "Education", 
+    "Finance"
+  ];
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -44,13 +54,59 @@ class _HomeScreenState extends State<HomeScreen> {
       if (result != null && mounted) {
         setState(() {
           _amount = (result['amount'] as num).toDouble();
-          _category = result['category'].toString();
+          String predicted = result['category'].toString();
+          
+          if (!_categories.contains(predicted)) {
+            _categories.add(predicted);
+          }
+          _category = predicted;
           _isAnalyzing = false;
         });
       } else {
         if (mounted) setState(() => _isAnalyzing = false);
       }
     });
+  }
+
+  void _showAddCategoryDialog() {
+    String newCat = "";
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: const Text("Add New Category", style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: TextField(
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          onChanged: (val) => newCat = val,
+          decoration: InputDecoration(
+            hintText: "Category Name",
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (newCat.trim().isNotEmpty) {
+                setState(() {
+                  if (!_categories.contains(newCat.trim())) {
+                    _categories.add(newCat.trim());
+                  }
+                  _category = newCat.trim();
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
   }
 
   IconData _getIcon(String category) {
@@ -70,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_controller.text.isEmpty || _amount <= 0) return;
 
     final String sentence = _controller.text;
-    final String category = _category;
+    final String finalCategory = _category;
 
     showDialog(
       context: context,
@@ -82,18 +138,18 @@ class _HomeScreenState extends State<HomeScreen> {
       await _db.saveExpense(ExpenseModel(
         sentence: sentence,
         amount: _amount,
-        category: category,
+        category: finalCategory,
         date: DateTime.now(),
       ));
 
-      await AIService.teachAI(sentence, category);
+      await AIService.teachAI(sentence, finalCategory);
 
       if (mounted) {
         Navigator.pop(context);
         _controller.clear();
         setState(() { _amount = 0.0; _category = "Detecting..."; });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Expense Logged & AI Updated!")),
+          const SnackBar(content: Text("Expense Logged & AI Re-trained!")),
         );
       }
     } catch (e) {
@@ -201,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildMetric("LKR ${_amount.toInt()}", "ESTIMATED AMOUNT"),
-              _buildMetric(_category, "AI CATEGORY"),
+              _buildCategorySelector(),
             ],
           ),
           const SizedBox(height: 25),
@@ -219,6 +275,42 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
+    );
+  }
+
+  Widget _buildCategorySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("CATEGORY", style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _categories.contains(_category) ? _category : null,
+            hint: Text(_category, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            dropdownColor: const Color(0xFF0F172A),
+            icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+            items: [
+              ..._categories.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                );
+              }),
+              const DropdownMenuItem<String>(
+                value: "ADD_NEW",
+                child: Text("+ Add New", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+              ),
+            ],
+            onChanged: (String? newValue) {
+              if (newValue == "ADD_NEW") {
+                _showAddCategoryDialog();
+              } else if (newValue != null) {
+                setState(() => _category = newValue);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 
