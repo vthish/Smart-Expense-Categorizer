@@ -1,51 +1,91 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/expense_model.dart';
 import '../services/firebase_service.dart';
 import '../widgets/glass_container.dart';
+import 'category_detail_screen.dart';
 
-class AnalyticsScreen extends StatelessWidget {
+enum DateRange { daily, weekly, monthly, yearly }
+
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final FirebaseService db = FirebaseService();
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
 
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  final FirebaseService _db = FirebaseService();
+  DateRange _selectedRange = DateRange.monthly;
+
+  final List<Color> _chartColors = [
+    Colors.blueAccent,
+    Colors.purpleAccent,
+    Colors.orangeAccent,
+    Colors.greenAccent,
+    Colors.redAccent,
+    Colors.cyanAccent,
+    Colors.pinkAccent,
+    Colors.amberAccent,
+    Colors.tealAccent,
+  ];
+
+  DateTime get _startDate {
+    DateTime now = DateTime.now();
+    switch (_selectedRange) {
+      case DateRange.daily:
+        return DateTime(now.year, now.month, now.day);
+      case DateRange.weekly:
+        return now.subtract(const Duration(days: 7));
+      case DateRange.monthly:
+        return DateTime(now.year, now.month, 1);
+      case DateRange.yearly:
+        return DateTime(now.year, 1, 1);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        title: const Text("SPENDING ANALYTICS", style: TextStyle(fontSize: 14, letterSpacing: 2, color: Colors.white70)),
+        title: const Text("ANALYTICS",
+            style: TextStyle(fontSize: 14, letterSpacing: 2, color: Colors.white70)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: StreamBuilder<List<ExpenseModel>>(
-        stream: db.getExpensesByRange(DateTime.now().subtract(const Duration(days: 30)), DateTime.now()),
+        stream: _db.getExpensesByRange(_startDate, DateTime.now()),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          
+
           final expenses = snapshot.data!;
-          final categoryTotals = _calculateCategoryTotals(expenses);
+          final categoryTotals = _aggregateCategoryTotals(expenses);
+          final double totalAmount = expenses.fold(0, (sum, e) => sum + e.amount);
 
           return Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
+                _buildRangeSelector(),
                 const SizedBox(height: 20),
-                SizedBox(
-                  height: 250,
-                  child: PieChart(
-                    PieChartData(
-                      sections: _buildChartSections(categoryTotals),
-                      centerSpaceRadius: 50,
-                      sectionsSpace: 5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 40),
+                _buildTotalCard(totalAmount),
+                const SizedBox(height: 20),
                 Expanded(
                   child: ListView(
-                    children: categoryTotals.entries.map((entry) => _buildLegendItem(entry.key, entry.value)).toList(),
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      _buildChartAndLegend(categoryTotals),
+                      const SizedBox(height: 30),
+                      ...categoryTotals.entries
+                          .map((entry) => _buildCategoryRow(entry.key, entry.value, expenses)),
+                    ],
                   ),
                 ),
               ],
@@ -56,42 +96,160 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Map<String, double> _calculateCategoryTotals(List<ExpenseModel> expenses) {
-    Map<String, double> totals = {};
-    for (var expense in expenses) {
-      totals[expense.category] = (totals[expense.category] ?? 0) + expense.amount;
+  Widget _buildRangeSelector() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: DateRange.values.map((range) {
+        bool isSelected = _selectedRange == range;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedRange = range),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.blueAccent : Colors.white10,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(range.name.toUpperCase(),
+                style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white38,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold)),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildTotalCard(double total) {
+    return GlassContainer(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text("TOTAL EXPENSES",
+              style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text("Rs. ${total.toInt()}",
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartAndLegend(Map<String, double> totals) {
+    final categories = totals.keys.toList();
+    const visibleCount = 5;
+    final visibleCats =
+        categories.length > visibleCount ? categories.take(visibleCount - 1).toList() : categories;
+    final hiddenCats =
+        categories.length > visibleCount ? categories.skip(visibleCount - 1).toList() : [];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 3,
+          child: SizedBox(
+            height: 180,
+            child: PieChart(PieChartData(
+              sections: _buildSections(totals),
+              centerSpaceRadius: 40,
+              sectionsSpace: 3,
+            )),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...visibleCats.map(
+                  (cat) => _legendItem(cat, _chartColors[categories.indexOf(cat) % _chartColors.length])),
+              if (hiddenCats.isNotEmpty)
+                PopupMenuButton<String>(
+                  color: const Color(0xFF0F172A),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text("+ More",
+                        style: TextStyle(
+                            color: Colors.blueAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                  itemBuilder: (context) => hiddenCats
+                      .map<PopupMenuEntry<String>>((cat) => PopupMenuItem<String>(
+                            value: cat,
+                            child: _legendItem(
+                                cat, _chartColors[categories.indexOf(cat) % _chartColors.length]),
+                          ))
+                      .toList(),
+                ),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _legendItem(String label, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+              width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryRow(String category, double amount, List<ExpenseModel> all) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => CategoryDetailScreen(
+                    category: category, expenses: all.where((e) => e.category == category).toList()))),
+        child: GlassContainer(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(category, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text("Rs. ${amount.toInt()}",
+                  style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, double> _aggregateCategoryTotals(List<ExpenseModel> expenses) {
+    Map<String, double> totals = {
+      "Food": 0,
+      "Transport": 0,
+      "Health": 0,
+      "Shopping": 0,
+      "Utilities": 0,
+      "Education": 0,
+      "Finance": 0
+    };
+    for (var e in expenses) {
+      totals[e.category] = (totals[e.category] ?? 0) + e.amount;
     }
     return totals;
   }
 
-  List<PieChartSectionData> _buildChartSections(Map<String, double> totals) {
-    final colors = [Colors.blueAccent, Colors.purpleAccent, Colors.orangeAccent, Colors.greenAccent, Colors.redAccent, Colors.cyanAccent];
-    int index = 0;
-
-    return totals.entries.map((entry) {
-      final color = colors[index % colors.length];
-      index++;
-      return PieChartSectionData(
-        color: color,
-        value: entry.value,
-        title: '',
-        radius: 25,
-      );
+  List<PieChartSectionData> _buildSections(Map<String, double> totals) {
+    int i = 0;
+    final sortedEntries = totals.entries.toList();
+    return sortedEntries.where((e) => e.value > 0).map((entry) {
+      final color = _chartColors[sortedEntries.indexOf(entry) % _chartColors.length];
+      i++;
+      return PieChartSectionData(color: color, value: entry.value, radius: 18, title: '');
     }).toList();
-  }
-
-  Widget _buildLegendItem(String category, double amount) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: GlassContainer(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(category, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-            Text("Rs. ${amount.toInt()}", style: const TextStyle(color: Colors.white, fontSize: 16)),
-          ],
-        ),
-      ),
-    );
   }
 }
