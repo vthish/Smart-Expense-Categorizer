@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../models/expense_model.dart';
 import '../services/firebase_service.dart';
 import '../widgets/glass_container.dart';
@@ -43,6 +42,37 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       case DateRange.yearly:
         return DateTime(now.year, 1, 1);
     }
+  }
+
+  Route _smoothRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+          ),
+        );
+
+        var scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.fastLinearToSlowEaseIn,
+          ),
+        );
+
+        return FadeTransition(
+          opacity: fadeAnimation,
+          child: ScaleTransition(
+            scale: scaleAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 500),
+      reverseTransitionDuration: const Duration(milliseconds: 400),
+    );
   }
 
   @override
@@ -210,9 +240,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       child: GestureDetector(
         onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(
-                builder: (context) => CategoryDetailScreen(
-                    category: category, expenses: all.where((e) => e.category == category).toList()))),
+            _smoothRoute(CategoryDetailScreen(
+                category: category, expenses: all.where((e) => e.category == category).toList()))),
         child: GlassContainer(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -244,11 +273,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   List<PieChartSectionData> _buildSections(Map<String, double> totals) {
-    int i = 0;
     final sortedEntries = totals.entries.toList();
     return sortedEntries.where((e) => e.value > 0).map((entry) {
       final color = _chartColors[sortedEntries.indexOf(entry) % _chartColors.length];
-      i++;
       return PieChartSectionData(color: color, value: entry.value, radius: 18, title: '');
     }).toList();
   }

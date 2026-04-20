@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
-  List<String> _categories = [
+  final List<String> _categories = [
     "Food", 
     "Transport", 
     "Health", 
@@ -38,6 +38,37 @@ class _HomeScreenState extends State<HomeScreen> {
     _debounce?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Route _smoothRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+          ),
+        );
+
+        var scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.fastLinearToSlowEaseIn,
+          ),
+        );
+
+        return FadeTransition(
+          opacity: fadeAnimation,
+          child: ScaleTransition(
+            scale: scaleAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 500),
+      reverseTransitionDuration: const Duration(milliseconds: 400),
+    );
   }
 
   void _onInputChanged(String val) {
@@ -202,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
       currentIndex: _currentIndex,
       onTap: (index) {
         if (index == 1) {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AnalyticsScreen()));
+          Navigator.push(context, _smoothRoute(const AnalyticsScreen()));
         } else {
           setState(() => _currentIndex = index);
         }
@@ -374,13 +405,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.receipt_long_outlined, color: Colors.white10, size: 60),
-          const SizedBox(height: 15),
-          const Text("No transactions yet", style: TextStyle(color: Colors.white24)),
+          SizedBox(height: 15),
+          Text("No transactions yet", style: TextStyle(color: Colors.white24)),
         ],
       ),
     );

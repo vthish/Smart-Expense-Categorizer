@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class AIService {
   static const String _baseUrl = "https://venu17-smart-expense-ai.hf.space";
@@ -15,7 +16,7 @@ class AIService {
         return jsonDecode(response.body);
       }
     } catch (e) {
-      print("Prediction failed: $e");
+      debugPrint("Prediction failed: $e");
     }
     return null;
   }
@@ -31,7 +32,7 @@ class AIService {
         }),
       );
     } catch (e) {
-      print("Self-learning update failed: $e");
+      debugPrint("Self-learning update failed: $e");
     }
   }
 }
