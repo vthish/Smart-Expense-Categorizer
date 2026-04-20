@@ -7,10 +7,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import SGDClassifier
 import re
 import os
+from huggingface_hub import HfApi
 
 app = FastAPI()
 
-# Enable CORS for all origins to avoid connectivity issues
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,44 +18,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_DIR = "models"
-MODEL_PATH = os.path.join(MODEL_DIR, "smart_model.pkl")
-VEC_PATH = os.path.join(MODEL_DIR, "vectorizer.pkl")
-DATA_PATH = "../assets/data.csv"
+# Configuration from Environment Variables (Secrets)
+REPO_ID = "vthish/Smart-Expense-Categorizer" # Change to your repo id
+HF_TOKEN = os.getenv("HF_TOKEN")
+MODEL_PATH = "models/smart_model.pkl"
+VEC_PATH = "models/vectorizer.pkl"
+DATA_PATH = "data.csv"
 
-class InputData(BaseModel):
-    text: str
+api = HfApi()
+
+class TrainingData(BaseModel):
+    sentence: str
+    category: str
+
+def retrain_and_upload(new_sentence, new_category):
+    if not HF_TOKEN:
+        print("HF_TOKEN not set!")
+        return
+
+    # Update CSV
+    df = pd.read_csv(DATA_PATH)
+    new_row = pd.DataFrame([[new_sentence, new_category]], columns=['sentence', 'category'])
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(DATA_PATH, index=False)
+
+    # Retrain
+    vec = TfidfVectorizer(ngram_range=(1, 2))
+    X = vec.fit_transform(df['sentence'].values.astype('U'))
+    y = df['category']
+    model = SGDClassifier(loss='modified_huber')
+    model.fit(X, y)
+
+    # Save
+    joblib.dump(model, MODEL_PATH)
+    joblib.dump(vec, VEC_PATH)
+
+    # Upload back to Space to keep it persistent
+    for file in [DATA_PATH, MODEL_PATH, VEC_PATH]:
+        api.upload_file(
+            path_or_fileobj=file,
+            path_in_repo=file,
+            repo_id=REPO_ID,
+            repo_type="space",
+            token=HF_TOKEN
+        )
+    print("AI self-learned and updated.")
 
 @app.post("/predict")
-async def predict(data: InputData):
+async def predict(data: dict):
     try:
-        # Debugging: Log the incoming request
-        print(f"Received request: {data.text}")
-        
         model = joblib.load(MODEL_PATH)
         vec = joblib.load(VEC_PATH)
-        clean_text = data.text.lower().strip()
-        
-        # Predict Category
-        v = vec.transform([clean_text])
+        text = data['text'].lower().strip()
+        v = vec.transform([text])
         category = model.predict(v)[0]
-        
-        # Extract Amount using regex
-        nums = re.findall(r'\d+', clean_text)
+        nums = re.findall(r'\d+', text)
         amount = int(nums[0]) if nums else 0
-        
-        print(f"Prediction: {category}, Amount: {amount}")
-        
-        return {
-            "category": str(category),
-            "amount": amount,
-            "status": "success"
-        }
+        return {"category": str(category), "amount": amount}
     except Exception as e:
-        print(f"Internal Error: {e}")
-        return {"category": "Other", "amount": 0, "status": "error"}
+        return {"category": "Other", "amount": 0}
+
+@app.post("/learn")
+async def learn(data: TrainingData, background_tasks: BackgroundTasks):
+    background_tasks.add_task(retrain_and_upload, data.sentence, data.category)
+    return {"message": "Learning process started"}
 
 if __name__ == "__main__":
     import uvicorn
-    # Bind to 0.0.0.0 and your port 8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
