@@ -4,7 +4,7 @@ import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../models/expense_model.dart';
 import '../widgets/glass_container.dart';
-import 'analytics_screen.dart'; // Ensure this exists
+import 'analytics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,6 +63,46 @@ class _HomeScreenState extends State<HomeScreen> {
       case "Education": return Icons.school_outlined;
       case "Finance": return Icons.savings_outlined;
       default: return Icons.category_outlined;
+    }
+  }
+
+  Future<void> _confirmExpense() async {
+    if (_controller.text.isEmpty || _amount <= 0) return;
+
+    final String sentence = _controller.text;
+    final String category = _category;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await _db.saveExpense(ExpenseModel(
+        sentence: sentence,
+        amount: _amount,
+        category: category,
+        date: DateTime.now(),
+      ));
+
+      await AIService.teachAI(sentence, category);
+
+      if (mounted) {
+        Navigator.pop(context);
+        _controller.clear();
+        setState(() { _amount = 0.0; _category = "Detecting..."; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Expense Logged & AI Updated!")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
     }
   }
 
@@ -180,19 +220,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  void _confirmExpense() async {
-    if (_controller.text.isEmpty || _amount <= 0) return;
-    await _db.saveExpense(ExpenseModel(
-      sentence: _controller.text,
-      amount: _amount,
-      category: _category,
-      date: DateTime.now(),
-    ));
-    _controller.clear();
-    setState(() { _amount = 0.0; _category = "Detecting..."; });
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Expense Logged!")));
   }
 
   Widget _buildMetric(String val, String label) {
