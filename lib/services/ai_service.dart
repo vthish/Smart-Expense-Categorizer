@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 class AIService {
-  // Updated with your specific local IPv4 address
-  static const String _baseUrl = "http://192.168.8.177:8000";
+  static const String _baseUrl = "https://venu17-smart-expense-ai.hf.space";
 
   static Future<Map<String, dynamic>?> predict(String text) async {
     try {
@@ -12,14 +12,27 @@ class AIService {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"text": text}),
       );
-
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
     } catch (e) {
-      // Print error to terminal for debugging
-      print("AI Service Error: $e");
+      debugPrint("Prediction failed: $e");
     }
     return null;
+  }
+
+  static Future<void> teachAI(String sentence, String category) async {
+    try {
+      await http.post(
+        Uri.parse("$_baseUrl/learn"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "sentence": sentence,
+          "category": category,
+        }),
+      );
+    } catch (e) {
+      debugPrint("Self-learning update failed: $e");
+    }
   }
 }

@@ -19,6 +19,7 @@ class FirebaseService {
     return _db.collection('expenses')
         .where('date', isGreaterThanOrEqualTo: start)
         .where('date', isLessThanOrEqualTo: end)
+        .orderBy('date', descending: true)
         .snapshots()
         .map((snap) => snap.docs
             .map((doc) => ExpenseModel.fromMap(doc.data(), doc.id))
