@@ -18,16 +18,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   final AuthService _auth = AuthService();
-  Timer? _debounce;
+  final FirebaseService _db = FirebaseService();
   
+  late Stream<List<ExpenseModel>> _expenseStream;
+  Timer? _debounce;
+
   String _category = "Detecting...";
   double _amount = 0.0;
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
   final List<String> _categories = [
-    "Food", "Transport", "Health", "Shopping", "Utilities", "Education", "Finance"
+    "Food",
+    "Transport",
+    "Health",
+    "Shopping",
+    "Utilities",
+    "Education",
+    "Finance"
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _expenseStream = _db.getExpensesByRange(
+      DateTime.now().subtract(const Duration(days: 30)),
+      DateTime.now(),
+    );
+  }
 
   @override
   void dispose() {
@@ -41,23 +59,36 @@ class _HomeScreenState extends State<HomeScreen> {
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-          CurvedAnimation(parent: animation, curve: const Interval(0.0, 0.6, curve: Curves.easeIn)),
+          CurvedAnimation(
+            parent: animation, 
+            curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+          ),
         );
         var scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
           CurvedAnimation(parent: animation, curve: Curves.fastLinearToSlowEaseIn),
         );
-        return FadeTransition(opacity: fadeAnimation, child: ScaleTransition(scale: scaleAnimation, child: child));
+        return FadeTransition(
+          opacity: fadeAnimation, 
+          child: ScaleTransition(scale: scaleAnimation, child: child),
+        );
       },
       transitionDuration: const Duration(milliseconds: 500),
     );
   }
 
   void _onInputChanged(String val) {
-    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    if (_debounce?.isActive ?? false) {
+      _debounce?.cancel();
+    }
+    
     if (val.trim().isEmpty) {
-      setState(() { _amount = 0.0; _category = "Detecting..."; });
+      setState(() {
+        _amount = 0.0;
+        _category = "Detecting...";
+      });
       return;
     }
+
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       setState(() => _isAnalyzing = true);
       final result = await AIService.predict(val);
@@ -65,43 +96,61 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _amount = (result['amount'] as num).toDouble();
           String predicted = result['category'].toString();
-          if (!_categories.contains(predicted)) _categories.add(predicted);
+          if (!_categories.contains(predicted)) {
+            _categories.add(predicted);
+          }
           _category = predicted;
           _isAnalyzing = false;
         });
       } else {
-        if (mounted) setState(() => _isAnalyzing = false);
+        if (mounted) {
+          setState(() => _isAnalyzing = false);
+        }
       }
     });
   }
 
   Future<void> _confirmExpense() async {
-    if (_controller.text.isEmpty || _amount <= 0) return;
-    final FirebaseService db = FirebaseService(); 
-    
-    showDialog(context: context, barrierDismissible: false, builder: (context) => const Center(child: CircularProgressIndicator()));
+    if (_controller.text.isEmpty || _amount <= 0) {
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
-      await db.saveExpense(ExpenseModel(
+      await _db.saveExpense(ExpenseModel(
         sentence: _controller.text,
         amount: _amount,
         category: _category,
         date: DateTime.now(),
       ));
+      
       await AIService.teachAI(_controller.text, _category);
+      
       if (mounted) {
         Navigator.pop(context);
         _controller.clear();
-        setState(() { _amount = 0.0; _category = "Detecting..."; });
+        setState(() {
+          _amount = 0.0;
+          _category = "Detecting...";
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Expense Logged!")),
+        );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final FirebaseService db = FirebaseService();
     final User? user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
@@ -109,7 +158,11 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: _buildBottomNav(),
       body: Stack(
         children: [
-          Positioned(top: -100, left: -50, child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15))),
+          Positioned(
+            top: -100,
+            left: -50,
+            child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15)),
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -121,8 +174,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 25),
                   _buildMainHeroCard(),
                   const SizedBox(height: 30),
-                  const Text("RECENT ACTIVITY", style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  Expanded(child: _buildTransactionList(db)),
+                  const Text(
+                    "RECENT ACTIVITY",
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(child: _buildTransactionList()),
                 ],
               ),
             ),
@@ -139,8 +201,14 @@ class _HomeScreenState extends State<HomeScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Hello, $name!", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
-            const Text("Smart Tracker", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              "Hello, $name!",
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+            ),
+            const Text(
+              "Smart Tracker",
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         GestureDetector(
@@ -161,55 +229,21 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
         title: const Text("Logout", style: TextStyle(color: Colors.white)),
-        content: const Text("Are you sure you want to sign out?", style: TextStyle(color: Colors.white70)),
+        content: const Text(
+          "Are you sure you want to sign out?",
+          style: TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          TextButton(onPressed: () { _auth.signOut(); Navigator.pop(context); }, child: const Text("Logout", style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+            onPressed: () {
+              _auth.signOut();
+              Navigator.pop(context);
+            },
+            child: const Text("Logout", style: TextStyle(color: Colors.redAccent)),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTransactionList(FirebaseService db) {
-    return StreamBuilder<List<ExpenseModel>>(
-      stream: db.getExpensesByRange(DateTime.now().subtract(const Duration(days: 30)), DateTime.now()),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final list = snapshot.data!;
-        return ListView.builder(
-          itemCount: list.length,
-          itemBuilder: (context, index) => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: GlassContainer(
-              child: ListTile(
-                title: Text(list[index].sentence, style: const TextStyle(color: Colors.white)),
-                subtitle: Text(list[index].category, style: const TextStyle(color: Colors.white24)),
-                trailing: Text("Rs. ${list[index].amount.toInt()}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Helper widgets (Glow, Metric, etc.) would follow here...
-  Widget _buildGlow(Color color) => Container(width: 400, height: 400, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)]));
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      backgroundColor: const Color(0xFF0F172A),
-      selectedItemColor: Colors.blueAccent,
-      unselectedItemColor: Colors.white24,
-      currentIndex: _currentIndex,
-      onTap: (index) {
-        if (index == 1) Navigator.push(context, _smoothRoute(const AnalyticsScreen()));
-        else setState(() => _currentIndex = index);
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"),
-        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics"),
-      ],
     );
   }
 
@@ -220,13 +254,146 @@ class _HomeScreenState extends State<HomeScreen> {
           TextField(
             controller: _controller,
             onChanged: _onInputChanged,
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(hintText: "What did you spend on?", border: InputBorder.none),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+            decoration: InputDecoration(
+              hintText: "What did you spend on?",
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
+              border: InputBorder.none,
+              prefixIcon: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
+              suffixIcon: _isAnalyzing
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+            ),
+          ),
+          const Divider(color: Colors.white10, height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildMetric("LKR ${_amount.toInt()}", "ESTIMATED"),
+              _buildCategoryDisplay(),
+            ],
           ),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: _confirmExpense, child: const Text("Confirm Expense")),
+          GestureDetector(
+            onTap: _confirmExpense,
+            child: Container(
+              height: 50,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(colors: [Colors.blueAccent, Color(0xFF3B82F6)]),
+              ),
+              child: const Center(
+                child: Text(
+                  "Confirm Expense",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          )
         ],
       ),
+    );
+  }
+
+  Widget _buildMetric(String val, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(val, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildCategoryDisplay() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        const Text("CATEGORY", style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(_category, style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildTransactionList() {
+    return StreamBuilder<List<ExpenseModel>>(
+      stream: _expenseStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return const Center(
+            child: Text("No transactions yet", style: TextStyle(color: Colors.white24)),
+          );
+        }
+
+        return ListView.builder(
+          physics: const BouncingScrollPhysics(),
+          itemCount: list.length,
+          itemBuilder: (context, index) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: GlassContainer(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
+                  child: const Icon(Icons.receipt_long, color: Colors.white70, size: 20),
+                ),
+                title: Text(
+                  list[index].sentence,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+                subtitle: Text(
+                  list[index].category,
+                  style: const TextStyle(color: Colors.white24, fontSize: 12),
+                ),
+                trailing: Text(
+                  "Rs. ${list[index].amount.toInt()}",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlow(Color color) => Container(
+        width: 400,
+        height: 400,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)],
+        ),
+      );
+
+  Widget _buildBottomNav() {
+    return BottomNavigationBar(
+      backgroundColor: const Color(0xFF0F172A),
+      selectedItemColor: Colors.blueAccent,
+      unselectedItemColor: Colors.white24,
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        if (index == 1) {
+          Navigator.push(context, _smoothRoute(const AnalyticsScreen()));
+        } else {
+          setState(() => _currentIndex = index);
+        }
+      },
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"),
+        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics"),
+      ],
     );
   }
 }
