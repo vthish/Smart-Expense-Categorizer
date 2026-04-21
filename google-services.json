@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "298155782535",
+    "project_id": "smart-expense-app-17",
+    "storage_bucket": "smart-expense-app-17.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298155782535:android:4f18eca1a4c3513723a322",
+        "android_client_info": {
+          "package_name": "com.example.smart_expense_categorizer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "298155782535-cjdo7jpuhnjg7pqvhfvk28keoiqpm2mj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smart_expense_categorizer",
+            "certificate_hash": "35c46c13ae3065ab852420fc74ee5e9fad97aa02"
+          }
+        },
+        {
+          "client_id": "298155782535-k4t7j83gn5bp80rkmem6v1ovca7ukoae.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_ex6LJUwb5i1SK7nVxVpoxHwDS5wH89Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "298155782535-k4t7j83gn5bp80rkmem6v1ovca7ukoae.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "298155782535-vcusfajrtct6l7hdd1deqduhvcs34aof.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smartExpenseCategorizer"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

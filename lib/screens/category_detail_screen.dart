@@ -36,7 +36,7 @@ class CategoryDetailScreen extends StatelessWidget {
                         DateFormat('yyyy-MM-dd | hh:mm a').format(item.date),
                         style: const TextStyle(color: Colors.white24, fontSize: 11),
                       ),
-                      trailing: Text("Rs. ${item.amount.toInt()}",
+                      trailing: Text("Rs. ${item.amount.toStringAsFixed(2)}",
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),

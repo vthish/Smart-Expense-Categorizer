@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
+import '../services/auth_service.dart';
 import '../models/expense_model.dart';
 import '../widgets/glass_container.dart';
 import 'analytics_screen.dart';
@@ -15,23 +17,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
+  final AuthService _auth = AuthService();
   final FirebaseService _db = FirebaseService();
-  Timer? _debounce;
   
+  late Stream<List<ExpenseModel>> _expenseStream;
+  Timer? _debounce;
+
   String _category = "Detecting...";
   double _amount = 0.0;
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
-  final List<String> _categories = [
-    "Food", 
-    "Transport", 
-    "Health", 
-    "Shopping", 
-    "Utilities", 
-    "Education", 
-    "Finance"
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _expenseStream = _db.getExpensesByRange(
+      DateTime.now().subtract(const Duration(days: 30)),
+      DateTime.now(),
+    );
+  }
 
   @override
   void dispose() {
@@ -46,28 +50,19 @@ class _HomeScreenState extends State<HomeScreen> {
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
-            parent: animation,
-            curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+            parent: animation, 
+            curve: const Interval(0.0, 0.5, curve: Curves.easeIn)
           ),
         );
-
-        var scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.fastLinearToSlowEaseIn,
-          ),
+        var scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
         );
-
         return FadeTransition(
-          opacity: fadeAnimation,
-          child: ScaleTransition(
-            scale: scaleAnimation,
-            child: child,
-          ),
+          opacity: fadeAnimation, 
+          child: ScaleTransition(scale: scaleAnimation, child: child)
         );
       },
-      transitionDuration: const Duration(milliseconds: 500),
-      reverseTransitionDuration: const Duration(milliseconds: 400),
+      transitionDuration: const Duration(milliseconds: 300),
     );
   }
 
@@ -75,134 +70,83 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     
     if (val.trim().isEmpty) {
-      setState(() { _amount = 0.0; _category = "Detecting..."; });
+      setState(() { 
+        _amount = 0.0; 
+        _category = "Detecting..."; 
+      });
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => _isAnalyzing = true);
       final result = await AIService.predict(val);
+      
       if (result != null && mounted) {
         setState(() {
-          _amount = (result['amount'] as num).toDouble();
-          String predicted = result['category'].toString();
-          
-          if (!_categories.contains(predicted)) {
-            _categories.add(predicted);
+          var rawAmount = result['amount'];
+          if (rawAmount is String) {
+            _amount = double.tryParse(rawAmount) ?? 0.0;
+          } else if (rawAmount is num) {
+            _amount = rawAmount.toDouble();
+          } else {
+            _amount = 0.0;
           }
-          _category = predicted;
+
+          _category = result['category'].toString();
           _isAnalyzing = false;
         });
-      } else {
-        if (mounted) setState(() => _isAnalyzing = false);
+      } else if (mounted) {
+        setState(() => _isAnalyzing = false);
       }
     });
   }
 
-  void _showAddCategoryDialog() {
-    String newCat = "";
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        title: const Text("Add New Category", style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: TextField(
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          onChanged: (val) => newCat = val,
-          decoration: InputDecoration(
-            hintText: "Category Name",
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (newCat.trim().isNotEmpty) {
-                setState(() {
-                  if (!_categories.contains(newCat.trim())) {
-                    _categories.add(newCat.trim());
-                  }
-                  _category = newCat.trim();
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text("Add"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getIcon(String category) {
-    switch (category) {
-      case "Food": return Icons.restaurant_outlined;
-      case "Transport": return Icons.directions_bus_outlined;
-      case "Health": return Icons.health_and_safety_outlined;
-      case "Shopping": return Icons.shopping_bag_outlined;
-      case "Utilities": return Icons.lightbulb_outlined;
-      case "Education": return Icons.school_outlined;
-      case "Finance": return Icons.savings_outlined;
-      default: return Icons.category_outlined;
-    }
-  }
-
   Future<void> _confirmExpense() async {
     if (_controller.text.isEmpty || _amount <= 0) return;
-
-    final String sentence = _controller.text;
-    final String finalCategory = _category;
-
+    
     showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      context: context, 
+      barrierDismissible: false, 
+      builder: (context) => const Center(child: CircularProgressIndicator())
     );
 
     try {
       await _db.saveExpense(ExpenseModel(
-        sentence: sentence,
+        sentence: _controller.text,
         amount: _amount,
-        category: finalCategory,
+        category: _category,
         date: DateTime.now(),
       ));
-
-      await AIService.teachAI(sentence, finalCategory);
-
+      
+      AIService.teachAI(_controller.text, _category);
+      
       if (mounted) {
         Navigator.pop(context);
         _controller.clear();
-        setState(() { _amount = 0.0; _category = "Detecting..."; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Expense Logged & AI Re-trained!")),
-        );
+        setState(() { 
+          _amount = 0.0; 
+          _category = "Detecting..."; 
+        });
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
-      }
+      if (mounted) Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       bottomNavigationBar: _buildBottomNav(),
       body: Stack(
         children: [
-          Positioned(top: -100, left: -50, child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15))),
-          Positioned(bottom: -150, right: -100, child: _buildGlow(Colors.indigoAccent.withValues(alpha: 0.1))),
-
+          Positioned(
+            top: -100, 
+            left: -50, 
+            child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15))
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -210,11 +154,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 20),
-                  _buildHeader(),
+                  _buildHeader(user?.displayName ?? "User"),
                   const SizedBox(height: 25),
                   _buildMainHeroCard(),
                   const SizedBox(height: 30),
-                  _buildSectionHeader(),
+                  const Text(
+                    "RECENT ACTIVITY", 
+                    style: TextStyle(
+                      color: Colors.white38, 
+                      fontSize: 11, 
+                      fontWeight: FontWeight.bold, 
+                      letterSpacing: 1.5
+                    )
+                  ),
+                  const SizedBox(height: 10),
                   Expanded(child: _buildTransactionList()),
                 ],
               ),
@@ -222,46 +175,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      backgroundColor: const Color(0xFF0F172A),
-      selectedItemColor: Colors.blueAccent,
-      unselectedItemColor: Colors.white24,
-      currentIndex: _currentIndex,
-      onTap: (index) {
-        if (index == 1) {
-          Navigator.push(context, _smoothRoute(const AnalyticsScreen()));
-        } else {
-          setState(() => _currentIndex = index);
-        }
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"),
-        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics"),
-      ],
-    );
-  }
-
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Hello, Venusha!", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
-            const Text("Smart Tracker", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1)),
-          ],
-        ),
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white.withValues(alpha: 0.05),
-          child: const Icon(Icons.person_outline, color: Colors.white70, size: 18),
-        )
-      ],
     );
   }
 
@@ -274,12 +187,15 @@ class _HomeScreenState extends State<HomeScreen> {
             onChanged: _onInputChanged,
             style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
-              hintText: "Enter expense (e.g. 200 for tea)",
+              hintText: "What did you spend on?",
               hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
               border: InputBorder.none,
-              prefixIcon: const Icon(Icons.add_circle_outline_rounded, color: Colors.blueAccent),
+              prefixIcon: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
               suffixIcon: _isAnalyzing 
-                ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2))
+                ? const Padding(
+                    padding: EdgeInsets.all(12), 
+                    child: CircularProgressIndicator(strokeWidth: 2)
+                  ) 
                 : null,
             ),
           ),
@@ -287,21 +203,28 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMetric("LKR ${_amount.toInt()}", "ESTIMATED AMOUNT"),
-              _buildCategorySelector(),
+              _buildMetric("LKR ${_amount.toStringAsFixed(2)}", "ESTIMATED"),
+              _buildCategoryDisplay(),
             ],
           ),
-          const SizedBox(height: 25),
+          const SizedBox(height: 20),
           GestureDetector(
             onTap: _confirmExpense,
             child: Container(
-              height: 55,
+              height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(colors: [Colors.blueAccent, Color(0xFF3B82F6)]),
+                borderRadius: BorderRadius.circular(12), 
+                gradient: const LinearGradient(
+                  colors: [Colors.blueAccent, Color(0xFF3B82F6)]
+                )
               ),
-              child: const Center(child: Text("Confirm Expense", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+              child: const Center(
+                child: Text(
+                  "Confirm Expense", 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                )
+              ),
             ),
           )
         ],
@@ -309,118 +232,165 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategorySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("CATEGORY", style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-        DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: _categories.contains(_category) ? _category : null,
-            hint: Text(_category, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            dropdownColor: const Color(0xFF0F172A),
-            icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
-            items: [
-              ..._categories.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                );
-              }),
-              const DropdownMenuItem<String>(
-                value: "ADD_NEW",
-                child: Text("+ Add New", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+  Widget _buildTransactionList() {
+    return StreamBuilder<List<ExpenseModel>>(
+      stream: _expenseStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return const Center(
+            child: Text("No transactions yet", style: TextStyle(color: Colors.white24))
+          );
+        }
+        return ListView.builder(
+          physics: const BouncingScrollPhysics(),
+          itemCount: list.length,
+          itemBuilder: (context, index) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: GlassContainer(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: Colors.white.withValues(alpha: 0.05),
+                  child: const Icon(Icons.receipt_long, color: Colors.white70, size: 20),
+                ),
+                title: Text(
+                  list[index].sentence, 
+                  style: const TextStyle(color: Colors.white, fontSize: 14)
+                ),
+                subtitle: Text(
+                  list[index].category, 
+                  style: const TextStyle(color: Colors.white24, fontSize: 12)
+                ),
+                trailing: Text(
+                  "Rs. ${list[index].amount.toStringAsFixed(2)}", 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                ),
               ),
-            ],
-            onChanged: (String? newValue) {
-              if (newValue == "ADD_NEW") {
-                _showAddCategoryDialog();
-              } else if (newValue != null) {
-                setState(() => _category = newValue);
-              }
-            },
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(String name) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Hello, $name!", 
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)
+            ),
+            const Text(
+              "Smart Tracker", 
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+            ),
+          ],
         ),
-      ],
+        GestureDetector(
+          onTap: () => _showLogoutDialog(),
+          child: CircleAvatar(
+            radius: 20, 
+            backgroundColor: Colors.white.withValues(alpha: 0.05), 
+            child: const Icon(Icons.logout, color: Colors.white70, size: 18)
+          ),
+        )
+      ]
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context, 
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A), 
+        title: const Text("Logout", style: TextStyle(color: Colors.white)), 
+        content: const Text("Are you sure you want to sign out?", style: TextStyle(color: Colors.white70)), 
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")), 
+          TextButton(
+            onPressed: () { 
+              _auth.signOut(); 
+              Navigator.pop(context); 
+            }, 
+            child: const Text("Logout", style: TextStyle(color: Colors.redAccent))
+          )
+        ]
+      )
     );
   }
 
   Widget _buildMetric(String val, String label) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start, 
       children: [
-        Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-        const SizedBox(height: 6),
-        Text(val, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-      ],
+        Text(
+          label, 
+          style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
+        ), 
+        const SizedBox(height: 4), 
+        Text(
+          val, 
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+        )
+      ]
     );
   }
 
-  Widget _buildSectionHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildCategoryDisplay() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end, 
       children: [
-        const Text("RECENT ACTIVITY", 
-          style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-        TextButton(onPressed: () {}, child: const Text("See All", style: TextStyle(color: Colors.blueAccent, fontSize: 12))),
-      ],
-    );
-  }
-
-  Widget _buildTransactionList() {
-    return StreamBuilder<List<ExpenseModel>>(
-      stream: _db.getExpensesByRange(DateTime.now().subtract(const Duration(days: 30)), DateTime.now()),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final list = snapshot.data!;
-        return list.isEmpty 
-          ? _buildEmptyState()
-          : ListView.builder(
-              physics: const BouncingScrollPhysics(),
-              itemCount: list.length,
-              padding: const EdgeInsets.only(top: 10, bottom: 20),
-              itemBuilder: (context, index) => _buildTransactionItem(list[index]),
-            );
-      },
-    );
-  }
-
-  Widget _buildTransactionItem(ExpenseModel item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer(
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(
-            backgroundColor: Colors.white.withValues(alpha: 0.03),
-            child: Icon(_getIcon(item.category), color: Colors.white60, size: 20),
-          ),
-          title: Text(item.sentence, style: const TextStyle(color: Colors.white, fontSize: 14)),
-          subtitle: Text(item.category, style: const TextStyle(color: Colors.white24, fontSize: 12)),
-          trailing: Text("- Rs. ${item.amount.toInt()}", 
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, color: Colors.white10, size: 60),
-          SizedBox(height: 15),
-          Text("No transactions yet", style: TextStyle(color: Colors.white24)),
-        ],
-      ),
+        const Text(
+          "CATEGORY", 
+          style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
+        ), 
+        const SizedBox(height: 4), 
+        Text(
+          _category, 
+          style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
+        )
+      ]
     );
   }
 
   Widget _buildGlow(Color color) {
     return Container(
-      width: 400, height: 400,
-      decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)]),
+      width: 400, 
+      height: 400, 
+      decoration: BoxDecoration(
+        shape: BoxShape.circle, 
+        boxShadow: [
+          BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)
+        ]
+      )
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return BottomNavigationBar(
+      backgroundColor: const Color(0xFF0F172A), 
+      selectedItemColor: Colors.blueAccent, 
+      unselectedItemColor: Colors.white24, 
+      currentIndex: _currentIndex, 
+      onTap: (index) { 
+        if (index == 1) {
+          Navigator.push(context, _smoothRoute(const AnalyticsScreen())); 
+        } else {
+          setState(() => _currentIndex = index); 
+        }
+      }, 
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"), 
+        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics")
+      ]
     );
   }
 }

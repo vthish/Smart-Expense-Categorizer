@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class ExpenseModel {
   final String? id;
   final String sentence;
-  final double amount;
+  final double amount; 
   final String category;
   final DateTime date;
 
@@ -24,12 +24,12 @@ class ExpenseModel {
     };
   }
 
-  factory ExpenseModel.fromMap(Map<String, dynamic> map, String documentId) {
+  factory ExpenseModel.fromMap(Map<String, dynamic> map, String id) {
     return ExpenseModel(
-      id: documentId,
+      id: id,
       sentence: map['sentence'] ?? '',
       amount: (map['amount'] as num).toDouble(),
-      category: map['category'] ?? 'Other',
+      category: map['category'] ?? '',
       date: (map['date'] as Timestamp).toDate(),
     );
   }
