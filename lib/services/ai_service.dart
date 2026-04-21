@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -10,7 +9,6 @@ class AIService {
   static Future<Map<String, dynamic>?> predict(String text) async {
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
-    // 1. Personalized Lookup: Check if user has entered this exact sentence before
     if (uid.isNotEmpty) {
       try {
         final querySnapshot = await FirebaseFirestore.instance
@@ -22,19 +20,25 @@ class AIService {
 
         if (querySnapshot.docs.isNotEmpty) {
           final data = querySnapshot.docs.first.data();
-          debugPrint("Personalized pattern recognized locally.");
+          
+          double finalAmount = 0.0;
+          if (data['amount'] is num) {
+            finalAmount = (data['amount'] as num).toDouble();
+          } else if (data['amount'] is String) {
+            finalAmount = double.tryParse(data['amount']) ?? 0.0;
+          }
+
           return {
             'category': data['category'],
-            'amount': data['amount'],
+            'amount': finalAmount,
             'source': 'local_history'
           };
         }
       } catch (e) {
-        debugPrint("Local history lookup failed: $e");
+        // Ignored
       }
     }
 
-    // 2. General AI Fallback: Call the Hugging Face model if no local history found
     try {
       final response = await http.post(
         Uri.parse("$_baseUrl/predict"),
@@ -43,10 +47,22 @@ class AIService {
       );
       
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final result = jsonDecode(response.body);
+        
+        double finalAmount = 0.0;
+        if (result['amount'] != null) {
+          if (result['amount'] is num) {
+            finalAmount = (result['amount'] as num).toDouble();
+          } else {
+            finalAmount = double.tryParse(result['amount'].toString()) ?? 0.0;
+          }
+        }
+        
+        result['amount'] = finalAmount;
+        return result;
       }
     } catch (e) {
-      debugPrint("API Prediction failed: $e");
+      // Ignored
     }
     return null;
   }
@@ -62,7 +78,7 @@ class AIService {
         }),
       );
     } catch (e) {
-      debugPrint("Global self-learning update failed: $e");
+      // Ignored
     }
   }
 }

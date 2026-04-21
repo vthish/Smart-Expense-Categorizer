@@ -28,16 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
-  final List<String> _categories = [
-    "Food",
-    "Transport",
-    "Health",
-    "Shopping",
-    "Utilities",
-    "Education",
-    "Finance"
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -61,64 +51,63 @@ class _HomeScreenState extends State<HomeScreen> {
         var fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
           CurvedAnimation(
             parent: animation, 
-            curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+            curve: const Interval(0.0, 0.5, curve: Curves.easeIn)
           ),
         );
-        var scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
-          CurvedAnimation(parent: animation, curve: Curves.fastLinearToSlowEaseIn),
+        var scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
         );
         return FadeTransition(
           opacity: fadeAnimation, 
-          child: ScaleTransition(scale: scaleAnimation, child: child),
+          child: ScaleTransition(scale: scaleAnimation, child: child)
         );
       },
-      transitionDuration: const Duration(milliseconds: 500),
+      transitionDuration: const Duration(milliseconds: 300),
     );
   }
 
   void _onInputChanged(String val) {
-    if (_debounce?.isActive ?? false) {
-      _debounce?.cancel();
-    }
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
     
     if (val.trim().isEmpty) {
-      setState(() {
-        _amount = 0.0;
-        _category = "Detecting...";
+      setState(() { 
+        _amount = 0.0; 
+        _category = "Detecting..."; 
       });
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 500), () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => _isAnalyzing = true);
       final result = await AIService.predict(val);
+      
       if (result != null && mounted) {
         setState(() {
-          _amount = (result['amount'] as num).toDouble();
-          String predicted = result['category'].toString();
-          if (!_categories.contains(predicted)) {
-            _categories.add(predicted);
+          var rawAmount = result['amount'];
+          if (rawAmount is String) {
+            _amount = double.tryParse(rawAmount) ?? 0.0;
+          } else if (rawAmount is num) {
+            _amount = rawAmount.toDouble();
+          } else {
+            _amount = 0.0;
           }
-          _category = predicted;
+
+          _category = result['category'].toString();
           _isAnalyzing = false;
         });
-      } else {
-        if (mounted) {
-          setState(() => _isAnalyzing = false);
-        }
+      } else if (mounted) {
+        setState(() => _isAnalyzing = false);
       }
     });
   }
 
   Future<void> _confirmExpense() async {
-    if (_controller.text.isEmpty || _amount <= 0) {
-      return;
-    }
-
+    if (_controller.text.isEmpty || _amount <= 0) return;
+    
     showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      context: context, 
+      barrierDismissible: false, 
+      builder: (context) => const Center(child: CircularProgressIndicator())
     );
 
     try {
@@ -129,23 +118,18 @@ class _HomeScreenState extends State<HomeScreen> {
         date: DateTime.now(),
       ));
       
-      await AIService.teachAI(_controller.text, _category);
+      AIService.teachAI(_controller.text, _category);
       
       if (mounted) {
         Navigator.pop(context);
         _controller.clear();
-        setState(() {
-          _amount = 0.0;
-          _category = "Detecting...";
+        setState(() { 
+          _amount = 0.0; 
+          _category = "Detecting..."; 
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Expense Logged!")),
-        );
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -159,9 +143,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           Positioned(
-            top: -100,
-            left: -50,
-            child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15)),
+            top: -100, 
+            left: -50, 
+            child: _buildGlow(Colors.blueAccent.withValues(alpha: 0.15))
           ),
           SafeArea(
             child: Padding(
@@ -175,72 +159,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildMainHeroCard(),
                   const SizedBox(height: 30),
                   const Text(
-                    "RECENT ACTIVITY",
+                    "RECENT ACTIVITY", 
                     style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
+                      color: Colors.white38, 
+                      fontSize: 11, 
+                      fontWeight: FontWeight.bold, 
+                      letterSpacing: 1.5
+                    )
                   ),
                   const SizedBox(height: 10),
                   Expanded(child: _buildTransactionList()),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(String name) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Hello, $name!",
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-            ),
-            const Text(
-              "Smart Tracker",
-              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        GestureDetector(
-          onTap: () => _showLogoutDialog(),
-          child: CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.white.withValues(alpha: 0.05),
-            child: const Icon(Icons.logout, color: Colors.white70, size: 18),
-          ),
-        )
-      ],
-    );
-  }
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        title: const Text("Logout", style: TextStyle(color: Colors.white)),
-        content: const Text(
-          "Are you sure you want to sign out?",
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          TextButton(
-            onPressed: () {
-              _auth.signOut();
-              Navigator.pop(context);
-            },
-            child: const Text("Logout", style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -260,19 +191,19 @@ class _HomeScreenState extends State<HomeScreen> {
               hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
               border: InputBorder.none,
               prefixIcon: const Icon(Icons.add_circle_outline, color: Colors.blueAccent),
-              suffixIcon: _isAnalyzing
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : null,
+              suffixIcon: _isAnalyzing 
+                ? const Padding(
+                    padding: EdgeInsets.all(12), 
+                    child: CircularProgressIndicator(strokeWidth: 2)
+                  ) 
+                : null,
             ),
           ),
           const Divider(color: Colors.white10, height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMetric("LKR ${_amount.toInt()}", "ESTIMATED"),
+              _buildMetric("LKR ${_amount.toStringAsFixed(2)}", "ESTIMATED"),
               _buildCategoryDisplay(),
             ],
           ),
@@ -283,41 +214,21 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(colors: [Colors.blueAccent, Color(0xFF3B82F6)]),
+                borderRadius: BorderRadius.circular(12), 
+                gradient: const LinearGradient(
+                  colors: [Colors.blueAccent, Color(0xFF3B82F6)]
+                )
               ),
               child: const Center(
                 child: Text(
-                  "Confirm Expense",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
+                  "Confirm Expense", 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                )
               ),
             ),
           )
         ],
       ),
-    );
-  }
-
-  Widget _buildMetric(String val, String label) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(val, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  Widget _buildCategoryDisplay() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Text("CATEGORY", style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(_category, style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 
@@ -328,14 +239,12 @@ class _HomeScreenState extends State<HomeScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
         final list = snapshot.data ?? [];
         if (list.isEmpty) {
           return const Center(
-            child: Text("No transactions yet", style: TextStyle(color: Colors.white24)),
+            child: Text("No transactions yet", style: TextStyle(color: Colors.white24))
           );
         }
-
         return ListView.builder(
           physics: const BouncingScrollPhysics(),
           itemCount: list.length,
@@ -349,16 +258,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Icon(Icons.receipt_long, color: Colors.white70, size: 20),
                 ),
                 title: Text(
-                  list[index].sentence,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  list[index].sentence, 
+                  style: const TextStyle(color: Colors.white, fontSize: 14)
                 ),
                 subtitle: Text(
-                  list[index].category,
-                  style: const TextStyle(color: Colors.white24, fontSize: 12),
+                  list[index].category, 
+                  style: const TextStyle(color: Colors.white24, fontSize: 12)
                 ),
                 trailing: Text(
-                  "Rs. ${list[index].amount.toInt()}",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  "Rs. ${list[index].amount.toStringAsFixed(2)}", 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
                 ),
               ),
             ),
@@ -368,32 +277,120 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGlow(Color color) => Container(
-        width: 400,
-        height: 400,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)],
+  Widget _buildHeader(String name) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Hello, $name!", 
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)
+            ),
+            const Text(
+              "Smart Tracker", 
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+            ),
+          ],
         ),
-      );
+        GestureDetector(
+          onTap: () => _showLogoutDialog(),
+          child: CircleAvatar(
+            radius: 20, 
+            backgroundColor: Colors.white.withValues(alpha: 0.05), 
+            child: const Icon(Icons.logout, color: Colors.white70, size: 18)
+          ),
+        )
+      ]
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context, 
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A), 
+        title: const Text("Logout", style: TextStyle(color: Colors.white)), 
+        content: const Text("Are you sure you want to sign out?", style: TextStyle(color: Colors.white70)), 
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")), 
+          TextButton(
+            onPressed: () { 
+              _auth.signOut(); 
+              Navigator.pop(context); 
+            }, 
+            child: const Text("Logout", style: TextStyle(color: Colors.redAccent))
+          )
+        ]
+      )
+    );
+  }
+
+  Widget _buildMetric(String val, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, 
+      children: [
+        Text(
+          label, 
+          style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
+        ), 
+        const SizedBox(height: 4), 
+        Text(
+          val, 
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+        )
+      ]
+    );
+  }
+
+  Widget _buildCategoryDisplay() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end, 
+      children: [
+        const Text(
+          "CATEGORY", 
+          style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
+        ), 
+        const SizedBox(height: 4), 
+        Text(
+          _category, 
+          style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
+        )
+      ]
+    );
+  }
+
+  Widget _buildGlow(Color color) {
+    return Container(
+      width: 400, 
+      height: 400, 
+      decoration: BoxDecoration(
+        shape: BoxShape.circle, 
+        boxShadow: [
+          BoxShadow(color: color, blurRadius: 150, spreadRadius: 50)
+        ]
+      )
+    );
+  }
 
   Widget _buildBottomNav() {
     return BottomNavigationBar(
-      backgroundColor: const Color(0xFF0F172A),
-      selectedItemColor: Colors.blueAccent,
-      unselectedItemColor: Colors.white24,
-      currentIndex: _currentIndex,
-      onTap: (index) {
+      backgroundColor: const Color(0xFF0F172A), 
+      selectedItemColor: Colors.blueAccent, 
+      unselectedItemColor: Colors.white24, 
+      currentIndex: _currentIndex, 
+      onTap: (index) { 
         if (index == 1) {
-          Navigator.push(context, _smoothRoute(const AnalyticsScreen()));
+          Navigator.push(context, _smoothRoute(const AnalyticsScreen())); 
         } else {
-          setState(() => _currentIndex = index);
+          setState(() => _currentIndex = index); 
         }
-      },
+      }, 
       items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"),
-        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics"),
-      ],
+        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"), 
+        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: "Analytics")
+      ]
     );
   }
 }

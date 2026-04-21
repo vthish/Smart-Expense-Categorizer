@@ -157,7 +157,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         children: [
           const Text("TOTAL EXPENSES",
               style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-          Text("Rs. ${total.toInt()}",
+          Text("Rs. ${total.toStringAsFixed(2)}",
               style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         ],
       ),
@@ -247,7 +247,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(category, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text("Rs. ${amount.toInt()}",
+              Text("Rs. ${amount.toStringAsFixed(2)}",
                   style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -258,16 +258,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Map<String, double> _aggregateCategoryTotals(List<ExpenseModel> expenses) {
     Map<String, double> totals = {
-      "Food": 0,
-      "Transport": 0,
-      "Health": 0,
-      "Shopping": 0,
-      "Utilities": 0,
-      "Education": 0,
-      "Finance": 0
+      "Food": 0.0,
+      "Transport": 0.0,
+      "Health": 0.0,
+      "Shopping": 0.0,
+      "Utilities": 0.0,
+      "Education": 0.0,
+      "Finance": 0.0
     };
     for (var e in expenses) {
-      totals[e.category] = (totals[e.category] ?? 0) + e.amount;
+      if (totals.containsKey(e.category)) {
+        totals[e.category] = totals[e.category]! + e.amount;
+      } else {
+        totals[e.category] = e.amount;
+      }
     }
     return totals;
   }
