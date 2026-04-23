@@ -5,20 +5,20 @@
 ![Hugging Face](https://img.shields.io/badge/AI_Host-Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)
 ![Firebase](https://img.shields.io/badge/Database-Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white)
 
-**Smart Expense AI** is a next-generation personal finance tracker built with **Flutter** and powered by a custom **Machine Learning model** hosted on **Hugging Face**. Instead of manually filling out forms, users can simply type what they spent (e.g., *"bus ticket 150.50"*), and the AI automatically extracts the amount and predicts the correct category.
+**Smart Expense AI** is a next-generation personal finance tracker built with **Flutter** and powered by a custom **Machine Learning model** hosted on **Hugging Face**. Instead of manually filling out tedious forms, users can simply type what they spent (e.g., *"bus ticket 150.50"*), and the AI automatically extracts the exact decimal amount and predicts the correct category.
 
-The app features a stunning **Glassmorphism UI**, Dark Theme, and a self-learning backend that gets smarter with every transaction.
+The app features a stunning **Glassmorphism UI**, Dark Theme, Poppins typography, and a self-learning backend that gets smarter with every transaction.
 
 ---
 
 ## ✨ Key Features
 
-- **🧠 Natural Language Processing (NLP):** Just type your expense in plain text. The AI extracts the exact decimal amount and categorizes it.
+- **🧠 Natural Language Processing (NLP):** Just type your expense in plain text. The AI extracts the exact amount (including decimals/cents) and categorizes it instantly.
 - **🔄 Continuous Self-Learning:** If the AI makes a mistake, correcting it trains the model in the background. The app gets smarter every day!
-- **⚡ Personalized AI Cache:** Remembers your specific spending habits locally for lightning-fast, personalized categorization.
-- **🔐 Secure Google Authentication:** One-tap login via Firebase Auth.
+- **⚡ Personalized AI Cache:** Remembers your specific spending habits locally via Firestore for lightning-fast, personalized categorization.
+- **🔐 Secure Google Authentication:** One-tap secure login via Firebase Auth.
 - **📊 Advanced Analytics:** Interactive pie charts and detailed category breakdowns using `fl_chart`.
-- **🎨 Premium UI/UX:** Dark mode, Glassmorphism design, custom Poppins typography, and satisfying Haptic Feedback.
+- **🎨 Premium UI/UX:** Dark mode, Glassmorphism design, custom Google Fonts (Poppins), and satisfying Haptic Feedback on user interactions.
 
 ---
 
@@ -29,7 +29,7 @@ The app features a stunning **Glassmorphism UI**, Dark Theme, and a self-learnin
 - **Design:** Custom Glassmorphism UI, Dark Theme (`#020617`)
 - **State Management & Database:** Firebase Cloud Firestore
 - **Authentication:** Firebase Auth (Google Sign-In)
-- **Typography:** Google Fonts (Poppins)
+- **Typography & Feedback:** Google Fonts (Poppins) & Haptic Feedback
 
 ### Backend (AI Server)
 - **Framework:** FastAPI (Python)
@@ -42,10 +42,10 @@ The app features a stunning **Glassmorphism UI**, Dark Theme, and a self-learnin
 ## 🏗️ System Architecture
 
 1. **User Input:** User types *"water bill 5677.89"*.
-2. **Local Verification:** App checks Firestore for past identical entries to provide instant personalization.
+2. **Local Verification:** App checks Firestore for past identical entries to provide instant personalization and bypass unnecessary API calls.
 3. **AI Prediction:** If it's a new pattern, the text is sent to the FastAPI server on Hugging Face.
-4. **Data Extraction:** Regex captures the exact decimal amount (`5677.89`), and the NLP model predicts the category (`Utilities`).
-5. **Self-Learning Loop:** Upon confirmation, the expense is saved to Firestore, and a background task triggers the `/learn` endpoint to retrain the Hugging Face model with the new data.
+4. **Data Extraction:** An advanced Regex pattern (`\d+[.,]?\d*`) safely captures the exact decimal amount, and the NLP model predicts the category (e.g., `Utilities`).
+5. **Self-Learning Loop:** Upon confirmation, the expense is saved to Firestore, and a background task triggers the `/learn` endpoint to retrain the Hugging Face model dynamically.
 
 ---
 
@@ -54,7 +54,7 @@ The app features a stunning **Glassmorphism UI**, Dark Theme, and a self-learnin
 ### 1. Flutter Setup
 ```bash
 # Clone the repository
-git clone [https://github.com/your-username/smart-expense-ai.git](https://github.com/your-username/smart-expense-ai.git)
+git clone [https://github.com/vthish/smart-expense-ai.git](https://github.com/vthish/smart-expense-ai.git)
 
 # Navigate to the project directory
 cd smart-expense-ai
