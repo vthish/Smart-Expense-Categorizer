@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
@@ -104,6 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _confirmExpense() async {
     if (_controller.text.isEmpty || _amount <= 0) return;
     
+    HapticFeedback.mediumImpact();
+
     showDialog(
       context: context, 
       barrierDismissible: false, 
