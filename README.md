@@ -65,53 +65,83 @@ flutter pub get
 # Run the app
 flutter run
 
-###2. Backend Setup (Local Server)
-You can run the FastAPI backend locally using either the standard Python approach or Docker.
+## ⚙️ Backend Setup (Local Server)
 
-Method A: Normal Setup (Python/Pip)
-Bash
-# Navigate to the backend directory (if separated)
+You can run the FastAPI backend locally using either a **standard Python setup** or **Docker (recommended for consistency and scalability)**.
+
+---
+
+### 🅰️ Method 1: Python Environment Setup
+
+Follow these steps to run the backend using Python and pip:
+
+```bash
+# Navigate to the backend directory
 cd backend
 
 # Create a virtual environment
 python -m venv venv
 
 # Activate the virtual environment
+
 # On Windows:
 venv\Scripts\activate
+
 # On macOS/Linux:
 source venv/bin/activate
 
-# Install required dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Run the FastAPI server
+# Start the FastAPI server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
-Method B: Docker Setup (Recommended)
-Make sure you have Docker installed on your system.
+```
 
-Using Docker Build & Run:
+📌 The backend will be available at:
+http://localhost:8000
 
-Bash
+---
+
+### 🐳 Method 2: Docker Setup (Recommended)
+
+Using Docker ensures a consistent environment across different systems.
+
+#### 🔹 Option 1: Build & Run Manually
+
+```bash
 # Build the Docker image
 docker build -t smart-expense-ai-backend .
 
-# Run the container (Replace 'your_token_here' if testing Hugging Face sync)
+# Run the container
 docker run -p 8000:8000 --env HF_TOKEN=your_token_here smart-expense-ai-backend
-Using Docker Compose:
+```
 
-Bash
-# Start the backend services
+#### 🔹 Option 2: Using Docker Compose
+
+```bash
+# Start all services
 docker-compose up --build
-(Note: Ensure your lib/services/ai_service.dart points to your local backend http://10.0.2.2:8000 (for Android emulator) or http://127.0.0.1:8000 (for iOS simulator/Web) if you are testing locally).
+```
 
-👨‍💻 Developer
-Developed by Venusha Thishan (vthish)
+---
 
-Software Engineering Student at NIBM (HDSE)
+### 🔗 Connecting Your Flutter App
 
-Full Stack Developer & IoT Innovator based in Sri Lanka 🇱🇰
+When running the backend locally, update your API base URL in:
 
-GitHub Profile
+```
+lib/services/ai_service.dart
+```
 
-If you find this project interesting, don't forget to give it a ⭐!
+Use the appropriate endpoint:
+
+* Android Emulator: http://10.0.2.2:8000
+* iOS Simulator / Web: http://127.0.0.1:8000
+
+---
+
+### ✅ Notes
+
+* Ensure your backend is running before launching the Flutter app.
+* Replace `HF_TOKEN` with your Hugging Face API token if you're syncing models.
+* For production, consider deploying via Docker on a cloud platform.
