@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _expenseStream = _db.getExpensesByRange(
       DateTime.now().subtract(const Duration(days: 30)),
-      DateTime.now(),
+      DateTime.now().add(const Duration(days: 1)),
     );
   }
 
