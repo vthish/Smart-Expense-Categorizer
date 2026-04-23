@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -223,12 +224,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      
       await _db.saveExpense(ExpenseModel(
         sentence: _controller.text,
         amount: _amount,
         category: _category,
         date: DateTime.now(),
       ));
+
+      await FirebaseFirestore.instance.collection('learning_data').add({
+        'sentence': _controller.text,
+        'category': _category,
+        'amount': _amount,
+        'is_verified': true,
+        'userId': user?.uid ?? 'unknown',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
       
       AIService.teachAI(_controller.text, _category);
       
@@ -241,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> {
           msg: "Expense added successfully!",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
           backgroundColor: const Color(0xFF10B981),
           textColor: Colors.white,
           fontSize: 14.0
@@ -264,7 +275,18 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      print("FIREBASE ERROR: $e");
+      if (mounted) {
+        Navigator.pop(context);
+        Fluttertoast.showToast(
+          msg: "Error: ${e.toString()}",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 14.0
+        );
+      }
     }
   }
 
