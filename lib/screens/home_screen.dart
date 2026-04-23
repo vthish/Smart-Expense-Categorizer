@@ -177,6 +177,27 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (mounted) {
         Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text(
+                  "Expense added successfully!", 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.9),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
         _controller.clear();
         setState(() { 
           _amount = 0.0; 
