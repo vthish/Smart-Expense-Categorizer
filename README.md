@@ -1,5 +1,12 @@
 # 🚀 Smart Expense AI - Intelligent Expense Tracker
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Frontend-Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
+  <img src="https://img.shields.io/badge/AI_Host-Hugging_Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Database-Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white"/>
+</p>
+
 ---
 
 ## ✨ Overview
@@ -216,5 +223,5 @@ If you like this project:
 ---
 
 <p align="center">
-  <b>🔥 Built with passion + AI 🔥</b>
+  <b>🚀 V17</b>
 </p>
