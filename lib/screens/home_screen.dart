@@ -110,6 +110,47 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showAddCategoryDialog() {
+    TextEditingController newCatController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          title: const Text("Add New Category", style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: newCatController,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: "Enter category name",
+              hintStyle: TextStyle(color: Colors.white30),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+            ),
+            TextButton(
+              onPressed: () {
+                if (newCatController.text.trim().isNotEmpty) {
+                  setState(() {
+                    _categories.add(newCatController.text.trim());
+                    _category = newCatController.text.trim();
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Add", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
   Future<void> _confirmExpense() async {
     if (_controller.text.isEmpty || _amount <= 0 || _category == "Detecting...") return;
     
@@ -375,14 +416,22 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
             dropdownColor: const Color(0xFF0F172A),
             alignment: AlignmentDirectional.centerEnd,
-            items: _categories.map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value, style: const TextStyle(color: Colors.white)),
-              );
-            }).toList(),
+            items: [
+              ..._categories.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value, style: const TextStyle(color: Colors.white)),
+                );
+              }),
+              const DropdownMenuItem<String>(
+                value: "ADD_NEW",
+                child: Text("➕ Add New...", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+              )
+            ],
             onChanged: (String? newValue) {
-              if (newValue != null) {
+              if (newValue == "ADD_NEW") {
+                _showAddCategoryDialog();
+              } else if (newValue != null) {
                 setState(() {
                   _category = newValue;
                 });
