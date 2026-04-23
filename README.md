@@ -51,12 +51,25 @@ The app features a stunning **Glassmorphism UI**, Dark Theme, Poppins typography
 
 ## 🚀 Installation & Setup
 
-### 1. Backend Setup (Local)
+### 1. Flutter Setup (Mobile App)
+```bash
+# Clone the repository
+git clone [https://github.com/vthish/smart-expense-ai.git](https://github.com/vthish/smart-expense-ai.git)
 
+# Navigate to the project directory
+cd smart-expense-ai
+
+# Install dependencies
+flutter pub get
+
+# Run the app
+flutter run
+
+###2. Backend Setup (Local Server)
 You can run the FastAPI backend locally using either the standard Python approach or Docker.
 
-#### Method A: Normal Setup (Python/Pip)
-```bash
+Method A: Normal Setup (Python/Pip)
+Bash
 # Navigate to the backend directory (if separated)
 cd backend
 
@@ -74,3 +87,31 @@ pip install -r requirements.txt
 
 # Run the FastAPI server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+Method B: Docker Setup (Recommended)
+Make sure you have Docker installed on your system.
+
+Using Docker Build & Run:
+
+Bash
+# Build the Docker image
+docker build -t smart-expense-ai-backend .
+
+# Run the container (Replace 'your_token_here' if testing Hugging Face sync)
+docker run -p 8000:8000 --env HF_TOKEN=your_token_here smart-expense-ai-backend
+Using Docker Compose:
+
+Bash
+# Start the backend services
+docker-compose up --build
+(Note: Ensure your lib/services/ai_service.dart points to your local backend http://10.0.2.2:8000 (for Android emulator) or http://127.0.0.1:8000 (for iOS simulator/Web) if you are testing locally).
+
+👨‍💻 Developer
+Developed by Venusha Thishan (vthish)
+
+Software Engineering Student at NIBM (HDSE)
+
+Full Stack Developer & IoT Innovator based in Sri Lanka 🇱🇰
+
+GitHub Profile
+
+If you find this project interesting, don't forget to give it a ⭐!
