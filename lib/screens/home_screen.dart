@@ -42,11 +42,44 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserCategories();
     _loadLocalVocabulary();
     _expenseStream = _db.getExpensesByRange(
       DateTime.now().subtract(const Duration(days: 30)),
       DateTime.now().add(const Duration(days: 1)),
     );
+  }
+
+  Future<void> _loadUserCategories() async {
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('expenses')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+      
+      final Set<String> pastCategories = {};
+      for (var doc in snapshot.docs) {
+        final cat = doc.data()['category'] as String?;
+        if (cat != null && cat != "Detecting...") {
+          pastCategories.add(cat);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          for (var cat in pastCategories) {
+            if (!_categories.contains(cat)) {
+              _categories.add(cat);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading past categories: $e");
+    }
   }
 
   Future<void> _loadLocalVocabulary() async {
@@ -275,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print("FIREBASE ERROR: $e");
+      debugPrint("FIREBASE ERROR: $e");
       if (mounted) {
         Navigator.pop(context);
         Fluttertoast.showToast(
