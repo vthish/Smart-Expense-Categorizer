@@ -51,16 +51,26 @@ The app features a stunning **Glassmorphism UI**, Dark Theme, Poppins typography
 
 ## 🚀 Installation & Setup
 
-### 1. Flutter Setup
+### 1. Backend Setup (Local)
+
+You can run the FastAPI backend locally using either the standard Python approach or Docker.
+
+#### Method A: Normal Setup (Python/Pip)
 ```bash
-# Clone the repository
-git clone [https://github.com/vthish/smart-expense-ai.git](https://github.com/vthish/smart-expense-ai.git)
+# Navigate to the backend directory (if separated)
+cd backend
 
-# Navigate to the project directory
-cd smart-expense-ai
+# Create a virtual environment
+python -m venv venv
 
-# Install dependencies
-flutter pub get
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
 
-# Run the app
-flutter run
+# Install required dependencies
+pip install -r requirements.txt
+
+# Run the FastAPI server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
