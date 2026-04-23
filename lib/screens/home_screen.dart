@@ -29,6 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
+  final List<String> _categories = [
+    "Food", "Transport", "Health", "Shopping", "Utilities", "Education", "Finance", "Entertainment", "Other"
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -93,7 +97,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _amount = 0.0;
           }
 
-          _category = result['category'].toString();
+          String predictedCat = result['category'].toString();
+          if (!_categories.contains(predictedCat) && predictedCat != "Detecting...") {
+            _categories.add(predictedCat);
+          }
+          _category = predictedCat;
           _isAnalyzing = false;
         });
       } else if (mounted) {
@@ -102,8 +110,78 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showCategoryPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Select or Add Category", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _categories.map((c) => GestureDetector(
+                  onTap: () {
+                    setState(() => _category = c);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _category == c ? Colors.blueAccent : Colors.white10,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Text(c, style: TextStyle(color: _category == c ? Colors.white : Colors.white70, fontSize: 12)),
+                  ),
+                )).toList(),
+              ),
+              const Divider(color: Colors.white10, height: 30),
+              TextField(
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Type new category...",
+                  hintStyle: const TextStyle(color: Colors.white30),
+                  suffixIcon: const Icon(Icons.add_circle, color: Colors.blueAccent),
+                  filled: true,
+                  fillColor: Colors.black12,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onSubmitted: (val) {
+                  String newCat = val.trim();
+                  if (newCat.isNotEmpty) {
+                    setState(() {
+                      if (!_categories.contains(newCat)) _categories.add(newCat);
+                      _category = newCat;
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      }
+    );
+  }
+
   Future<void> _confirmExpense() async {
-    if (_controller.text.isEmpty || _amount <= 0) return;
+    if (_controller.text.isEmpty || _amount <= 0 || _category == "Detecting...") return;
     
     HapticFeedback.mediumImpact();
 
@@ -348,19 +426,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryDisplay() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end, 
-      children: [
-        const Text(
-          "CATEGORY", 
-          style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
-        ), 
-        const SizedBox(height: 4), 
-        Text(
-          _category, 
-          style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
-        )
-      ]
+    return GestureDetector(
+      onTap: _showCategoryPicker,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end, 
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text("CATEGORY", style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)),
+              SizedBox(width: 4),
+              Icon(Icons.edit, color: Colors.white30, size: 12),
+            ],
+          ), 
+          const SizedBox(height: 4), 
+          Text(
+            _category, 
+            style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
+          )
+        ]
+      ),
     );
   }
 
