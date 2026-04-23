@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/ai_service.dart';
 import '../services/firebase_service.dart';
 import '../services/auth_service.dart';
@@ -34,13 +36,52 @@ class _HomeScreenState extends State<HomeScreen> {
     "Food", "Transport", "Health", "Shopping", "Utilities", "Education", "Finance", "Entertainment", "Other"
   ];
 
+  Map<String, String> _localVocabulary = {};
+
   @override
   void initState() {
     super.initState();
+    _loadLocalVocabulary();
     _expenseStream = _db.getExpensesByRange(
       DateTime.now().subtract(const Duration(days: 30)),
       DateTime.now().add(const Duration(days: 1)),
     );
+  }
+
+  Future<void> _loadLocalVocabulary() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _localVocabulary = Map<String, String>.from(
+        prefs.getKeys().fold({}, (map, key) {
+          if (key.startsWith('vocab_')) {
+            map[key.replaceFirst('vocab_', '')] = prefs.getString(key) ?? '';
+          }
+          return map;
+        })
+      );
+    });
+  }
+
+  Future<void> _saveToLocalVocabulary(String sentence, String category) async {
+    final words = sentence.toLowerCase().replaceAll(RegExp(r'[^a-z\s]'), '').split(' ');
+    final prefs = await SharedPreferences.getInstance();
+    
+    for (String word in words) {
+      if (word.isNotEmpty && word.length > 2) {
+        await prefs.setString('vocab_$word', category);
+        _localVocabulary[word] = category;
+      }
+    }
+  }
+
+  String? _checkLocalVocabulary(String sentence) {
+    final words = sentence.toLowerCase().replaceAll(RegExp(r'[^a-z\s]'), '').split(' ');
+    for (String word in words) {
+      if (_localVocabulary.containsKey(word)) {
+        return _localVocabulary[word];
+      }
+    }
+    return null;
   }
 
   @override
@@ -86,6 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => _isAnalyzing = true);
+      
+      final localCategory = _checkLocalVocabulary(val);
+      
       final result = await AIService.predict(val);
       
       if (result != null && mounted) {
@@ -100,6 +144,11 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           String predictedCat = result['category'].toString();
+          
+          if (localCategory != null) {
+            predictedCat = localCategory;
+          }
+
           if (!_categories.contains(predictedCat) && predictedCat != "Detecting...") {
             _categories.add(predictedCat);
           }
@@ -107,7 +156,15 @@ class _HomeScreenState extends State<HomeScreen> {
           _isAnalyzing = false;
         });
       } else if (mounted) {
-        setState(() => _isAnalyzing = false);
+        setState(() {
+           if (localCategory != null) {
+               _category = localCategory;
+               if (!_categories.contains(localCategory)) {
+                   _categories.add(localCategory);
+               }
+           }
+           _isAnalyzing = false;
+        });
       }
     });
   }
@@ -175,8 +232,21 @@ class _HomeScreenState extends State<HomeScreen> {
       
       AIService.teachAI(_controller.text, _category);
       
+      await _saveToLocalVocabulary(_controller.text, _category);
+      
       if (mounted) {
         Navigator.pop(context);
+
+        Fluttertoast.showToast(
+          msg: "Expense added successfully!",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          timeInSecForIosWeb: 1,
+          backgroundColor: const Color(0xFF10B981),
+          textColor: Colors.white,
+          fontSize: 14.0
+        );
+
         _controller.clear();
         setState(() { 
           _amount = 0.0; 
