@@ -18,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final AuthService _auth = AuthService();
   final FirebaseService _db = FirebaseService();
   
@@ -46,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -180,6 +182,16 @@ class _HomeScreenState extends State<HomeScreen> {
           _amount = 0.0; 
           _category = "Detecting..."; 
         });
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              0.0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
@@ -299,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         return ListView.builder(
+          controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           itemCount: list.length,
           itemBuilder: (context, index) => Container(
