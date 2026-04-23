@@ -216,5 +216,5 @@ If you like this project:
 ---
 
 <p align="center">
-  <b>🔥 Built with passion + AI 🔥</b>
+  <b>🔥 Built by v17 ❤️ 🔥</b>
 </p>
