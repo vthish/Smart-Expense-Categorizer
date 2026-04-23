@@ -18,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final AuthService _auth = AuthService();
   final FirebaseService _db = FirebaseService();
   
@@ -29,12 +30,16 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isAnalyzing = false;
   int _currentIndex = 0;
 
+  final List<String> _categories = [
+    "Food", "Transport", "Health", "Shopping", "Utilities", "Education", "Finance", "Entertainment", "Other"
+  ];
+
   @override
   void initState() {
     super.initState();
     _expenseStream = _db.getExpensesByRange(
       DateTime.now().subtract(const Duration(days: 30)),
-      DateTime.now(),
+      DateTime.now().add(const Duration(days: 1)),
     );
   }
 
@@ -42,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -93,7 +99,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _amount = 0.0;
           }
 
-          _category = result['category'].toString();
+          String predictedCat = result['category'].toString();
+          if (!_categories.contains(predictedCat) && predictedCat != "Detecting...") {
+            _categories.add(predictedCat);
+          }
+          _category = predictedCat;
           _isAnalyzing = false;
         });
       } else if (mounted) {
@@ -102,10 +112,52 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showAddCategoryDialog() {
+    TextEditingController newCatController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          title: const Text("Add New Category", style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: newCatController,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: "Enter category name",
+              hintStyle: TextStyle(color: Colors.white30),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+            ),
+            TextButton(
+              onPressed: () {
+                if (newCatController.text.trim().isNotEmpty) {
+                  setState(() {
+                    _categories.add(newCatController.text.trim());
+                    _category = newCatController.text.trim();
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text("Add", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
   Future<void> _confirmExpense() async {
-    if (_controller.text.isEmpty || _amount <= 0) return;
+    if (_controller.text.isEmpty || _amount <= 0 || _category == "Detecting...") return;
     
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
+    HapticFeedback.vibrate();
 
     showDialog(
       context: context, 
@@ -129,6 +181,16 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() { 
           _amount = 0.0; 
           _category = "Detecting..."; 
+        });
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+            );
+          }
         });
       }
     } catch (e) {
@@ -249,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         return ListView.builder(
+          controller: _scrollController,
           physics: const BouncingScrollPhysics(),
           itemCount: list.length,
           itemBuilder: (context, index) => Container(
@@ -355,10 +418,39 @@ class _HomeScreenState extends State<HomeScreen> {
           "CATEGORY", 
           style: TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold)
         ), 
-        const SizedBox(height: 4), 
-        Text(
-          _category, 
-          style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
+        const SizedBox(height: 4),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _categories.contains(_category) ? _category : null,
+            hint: Text(
+              _category, 
+              style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)
+            ),
+            icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+            dropdownColor: const Color(0xFF0F172A),
+            alignment: AlignmentDirectional.centerEnd,
+            items: [
+              ..._categories.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value, style: const TextStyle(color: Colors.white)),
+                );
+              }),
+              const DropdownMenuItem<String>(
+                value: "ADD_NEW",
+                child: Text("➕ Add New...", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+              )
+            ],
+            onChanged: (String? newValue) {
+              if (newValue == "ADD_NEW") {
+                _showAddCategoryDialog();
+              } else if (newValue != null) {
+                setState(() {
+                  _category = newValue;
+                });
+              }
+            },
+          ),
         )
       ]
     );
