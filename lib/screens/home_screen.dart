@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Future.delayed(const Duration(milliseconds: 500), () {
           if (_scrollController.hasClients) {
             _scrollController.animateTo(
-              0.0,
+              _scrollController.position.maxScrollExtent,
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeOutCubic,
             );
