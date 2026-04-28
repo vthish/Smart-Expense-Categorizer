@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,11 +42,44 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _loadUserCategories();
     _loadLocalVocabulary();
     _expenseStream = _db.getExpensesByRange(
       DateTime.now().subtract(const Duration(days: 30)),
       DateTime.now().add(const Duration(days: 1)),
     );
+  }
+
+  Future<void> _loadUserCategories() async {
+    try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('expenses')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+      
+      final Set<String> pastCategories = {};
+      for (var doc in snapshot.docs) {
+        final cat = doc.data()['category'] as String?;
+        if (cat != null && cat != "Detecting...") {
+          pastCategories.add(cat);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          for (var cat in pastCategories) {
+            if (!_categories.contains(cat)) {
+              _categories.add(cat);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading past categories: $e");
+    }
   }
 
   Future<void> _loadLocalVocabulary() async {
@@ -223,12 +257,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
+      final User? user = FirebaseAuth.instance.currentUser;
+      
       await _db.saveExpense(ExpenseModel(
         sentence: _controller.text,
         amount: _amount,
         category: _category,
         date: DateTime.now(),
       ));
+
+      await FirebaseFirestore.instance.collection('learning_data').add({
+        'sentence': _controller.text,
+        'category': _category,
+        'amount': _amount,
+        'is_verified': true,
+        'userId': user?.uid ?? 'unknown',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
       
       AIService.teachAI(_controller.text, _category);
       
@@ -241,7 +286,6 @@ class _HomeScreenState extends State<HomeScreen> {
           msg: "Expense added successfully!",
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
           backgroundColor: const Color(0xFF10B981),
           textColor: Colors.white,
           fontSize: 14.0
@@ -264,7 +308,18 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
+      debugPrint("FIREBASE ERROR: $e");
+      if (mounted) {
+        Navigator.pop(context);
+        Fluttertoast.showToast(
+          msg: "Error: ${e.toString()}",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          textColor: Colors.white,
+          fontSize: 14.0
+        );
+      }
     }
   }
 
